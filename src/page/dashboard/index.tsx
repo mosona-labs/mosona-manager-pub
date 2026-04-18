@@ -1,0 +1,564 @@
+import type {PublicMonitor, ServerStatus, Category} from '@/api/public-preview';
+import type {DashboardLayout, Server} from './components/type';
+
+import {
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
+    CloudLightning,
+    Cpu,
+    HardDrive,
+    RotateCw,
+    Server as ServerIcon,
+    WifiOff,
+} from 'lucide-react';
+import {useEffect, useMemo, useState} from 'react';
+import {useParams} from 'react-router-dom';
+
+import CategorySection from './components/category';
+import SkeletonCard from './components/skeleton-card';
+import DetailBtn from './components/detail-btn';
+import LayoutBtn from './components/layout-btn';
+import usePublicPreview from './hook/use-public-preview';
+
+import {Card} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {ButtonGroup} from '@/components/ui/button-group';
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {cn} from '@/lib/utils';
+import {formatUptime} from '@/utils/time';
+import {MemoryUnit} from '@/utils/unit';
+import {Badge} from "@/components/ui/badge.tsx";
+
+const ONLINE_THRESHOLD_MS = 5_000;
+const STORAGE_LAYOUT_KEY = 'mosona-public-dashboard-layout';
+const STORAGE_DETAILS_KEY = 'mosona-public-dashboard-show-details';
+
+function readLayoutPreference(): DashboardLayout {
+    const saved = localStorage.getItem(STORAGE_LAYOUT_KEY);
+
+    if (saved === 'list' || saved === 'list2' || saved === 'grid') {
+        return saved;
+    }
+
+    return 'grid';
+}
+
+function readDetailsPreference() {
+    const val = localStorage.getItem(STORAGE_DETAILS_KEY);
+    // If user has never set a preference, default to showing full details on first open
+    if (val === null) return true;
+    return val === 'true';
+}
+
+function toPercent(used: number, total: number) {
+    if (!total || total <= 0) {
+        return 0;
+    }
+
+    return Math.round((used / total) * 100 * 100) / 100;
+}
+
+function categoryLabel(category: number) {
+    return category > 0 ? `Category ${category}` : 'Uncategorized';
+}
+
+function toServerCard(
+    server: PublicMonitor,
+    statuses: Record<string, ServerStatus>,
+    now: number | null
+): Server {
+    const info = statuses[String(server.id)];
+    const isOnline =
+        info && now ? now * 1000 - new Date(info.time).getTime() < ONLINE_THRESHOLD_MS : false;
+
+    return {
+        id: server.id,
+        name: server.name,
+        os: server.os ?? null,
+        location: server.county ?? null,
+        locationName: server.area ?? null,
+        status: isOnline ? 'online' : 'offline',
+        lastSeen: info?.time ?? null,
+        cpu: info?.cpu ?? 0,
+        memory: toPercent(info?.mem_used_mb ?? 0, info?.mem_total_mb ?? 0),
+        memory_used: info?.mem_used_mb ?? 0,
+        memory_total: info?.mem_total_mb ?? 0,
+        swap: toPercent(info?.swap_used_mb ?? 0, info?.swap_total_mb ?? 0),
+        swap_used: info?.swap_used_mb ?? 0,
+        swap_total: info?.swap_total_mb ?? 0,
+        disk: toPercent(info?.disk_used_gb ?? 0, info?.disk_total_gb ?? 0),
+        disk_used: info?.disk_used_gb ?? 0,
+        disk_total: info?.disk_total_gb ?? 0,
+        uptime: formatUptime(server.open_time ?? ''),
+        networkUp: info?.rx_kib_s ?? 0,
+        networkDown: info?.tx_kib_s ?? 0,
+        networkUpTotal: info?.rx_total_mb ?? 0,
+        networkDownTotal: info?.tx_total_mb ?? 0,
+        diskReadKibS: info?.disk_read_kib_s ?? 0,
+        diskWriteKibS: info?.disk_write_kib_s ?? 0,
+        diskReadIOPS: info?.disk_read_iops ?? 0,
+        diskWriteIOPS: info?.disk_write_iops ?? 0,
+        tcpTotal: info?.tcp_total ?? 0,
+        udpTotal: info?.udp_total ?? 0,
+        provider: server.provider ?? null,
+        cycle: server.cycle ?? null,
+        start_time: server.start_time ?? null,
+        end_time: server.end_time ?? null,
+        amount: server.amount ?? null,
+        bandwidth: server.bandwidth ?? null,
+        traffic: server.traffic ?? null,
+        note_public: server.note_public ?? null,
+    };
+}
+
+export default function Dashboard() {
+    const { name } = useParams();
+    const {
+        bootstrapState,
+        streamState,
+        page,
+        servers,
+        status,
+        categories: apiCategories,
+        now,
+        errorMessage,
+        streamMessage,
+        retry,
+    } = usePublicPreview(name);
+
+    const [layout, setLayout] = useState<DashboardLayout>(() => readLayoutPreference());
+    const [showDetails, setShowDetails] = useState(() => readDetailsPreference());
+    // Mounted controls fade-in animations for real content.
+    const [mounted, setMounted] = useState(false);
+    // Control skeleton visibility so it can fade out smoothly.
+    const [showSkeleton, setShowSkeleton] = useState(bootstrapState === 'loading');
+    const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_LAYOUT_KEY, layout);
+    }, [layout]);
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_DETAILS_KEY, String(showDetails));
+    }, [showDetails]);
+
+    useEffect(() => {
+        // When loading starts, show skeleton and hide content.
+        if (bootstrapState === 'loading') {
+            setShowSkeleton(true);
+            setMounted(false);
+        } else {
+            // Start fading in content slightly after loading ends
+            setTimeout(() => setMounted(true), 60);
+            // Fade out skeleton, then remove after duration
+            setTimeout(() => setShowSkeleton(false), 420);
+        }
+    }, [bootstrapState]);
+
+    const categories = useMemo(() => {
+        // Build a map of category id -> { id, name, sort }
+        const map = new Map<number, { id: number; name: string; sort: number }>();
+
+        // Add categories from API first (preserves names & sort)
+        (apiCategories ?? []).forEach((c: Category) => {
+            map.set(c.id, { id: c.id, name: c.name, sort: c.sort ?? 0 });
+        });
+
+        // Ensure any categories referenced by servers are present (fallback name)
+        for (const server of servers) {
+            const id = server.category ?? 0;
+            if (!map.has(id)) {
+                // Give unknown categories a large sort so API-defined categories remain ordered
+                map.set(id, { id, name: categoryLabel(id), sort: 1_000_000 });
+            }
+        }
+
+        // Convert and sort by sort then id
+        return Array.from(map.values())
+            .sort((a, b) => (a.sort - b.sort) || (a.id - b.id))
+            .map(({ id, name }) => ({ id, name }));
+    }, [servers, apiCategories]);
+
+    const categoryServerMap = useMemo(() => {
+        const map: Record<number, Server[]> = {};
+
+        for (const server of servers) {
+            const key = server.category ?? 0;
+            if (!map[key]) {
+                map[key] = [];
+            }
+
+            map[key].push(toServerCard(server, status, now));
+        }
+
+        return map;
+    }, [now, servers, status]);
+
+    useEffect(() => {
+        if (
+            categoryFilter !== null &&
+            !categories.some((category) => category.id === categoryFilter)
+        ) {
+            setCategoryFilter(null);
+        }
+    }, [categories, categoryFilter]);
+
+    const visibleServers = useMemo(() => {
+        return categoryFilter == null
+            ? categories.flatMap((category) => categoryServerMap[category.id] ?? [])
+            : (categoryServerMap[categoryFilter] ?? []);
+    }, [categories, categoryFilter, categoryServerMap]);
+
+    const overview = useMemo(() => {
+        const total = visibleServers.length;
+        const online = visibleServers.filter((server) => server.status === 'online');
+
+        return {
+            total,
+            online: online.length,
+            avgCpu:
+                total > 0
+                    ? online.reduce((sum, server) => sum + server.cpu, 0) / Math.max(total, 1)
+                    : 0,
+            avgMemory:
+                total > 0
+                    ? online.reduce((sum, server) => sum + server.memory, 0) / Math.max(total, 1)
+                    : 0,
+            sumRX: online.reduce((sum, server) => sum + server.networkUp, 0),
+            sumTX: online.reduce((sum, server) => sum + server.networkDown, 0),
+        };
+    }, [visibleServers]);
+
+    // We render the main content below and overlay a skeleton when `showSkeleton` is true.
+
+    if (bootstrapState === 'not_found') {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-background p-6">
+                <Card className="max-w-lg p-6">
+                    <div className="flex items-center gap-3">
+                        <WifiOff className="text-muted-foreground" />
+                        <div>
+                            <h1 className="text-xl font-semibold">Public page not found</h1>
+                            <p className="text-sm text-muted-foreground">
+                                The requested preview name or custom domain is not enabled.
+                            </p>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
+
+    if (bootstrapState === 'error') {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-background p-6">
+                <Card className="max-w-lg p-6">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <WifiOff className="text-muted-foreground" />
+                            <div>
+                                <h1 className="text-xl font-semibold">
+                                    Unable to load status page
+                                </h1>
+                                <p className="text-sm text-muted-foreground">
+                                    {errorMessage ?? 'Failed to load public preview data'}
+                                </p>
+                            </div>
+                        </div>
+                        <Button onClick={retry}>
+                            <RotateCw />
+                            Retry
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-full p-5 h-full overflow-y-auto pb-24 min-h-screen relative flex justify-center">
+                <div className="w-full max-w-[1800px] relative">
+                {/* Skeleton overlay */}
+                {showSkeleton ? (
+                    <div
+                        className="absolute inset-0 z-40 bg-transparent flex items-start justify-center pointer-events-none transition-opacity duration-400 overflow-hidden h-screen"
+                        style={{ opacity: bootstrapState === 'loading' ? 1 : 0 }}
+                    >
+                        <div className="w-full">
+                            <div className="flex flex-row justify-between items-center mb-3">
+                                <div>
+                                    <div className="h-8 w-48 bg-muted-foreground/10 rounded animate-pulse" />
+                                    <div className="h-4 w-64 bg-muted-foreground/8 rounded mt-2 animate-pulse" />
+                                </div>
+                                <div className="flex flex-row gap-2">
+                                    <div className="h-6 w-28 bg-muted-foreground/8 rounded animate-pulse" />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="grid gap-4 grid-cols-2 xl:grid-cols-4 mb-4">
+                                    {Array.from({ length: 4 }).map((_, i) => (
+                                        <div key={i} className="border-border bg-card p-4 animate-pulse rounded-xl border">
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-lg bg-muted-foreground/10 p-2 h-10 w-10" />
+                                                <div>
+                                                    <div className="h-3 w-28 bg-muted-foreground/10 rounded mb-2" />
+                                                    <div className="h-6 w-24 bg-muted-foreground/8 rounded" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
+                                    {Array.from({ length: 8 }).map((_, i) => (
+                                        <SkeletonCard key={i} layout={'grid'} />
+                                    ))}
+                                </div>
+
+                                <div className="mt-4 flex flex-col gap-2 lg:flex-row justify-between lg:items-center">
+                                    <div className="flex flex-col sm:flex-row justify-between lg:justify-start gap-2">
+                                        <div className="h-8 w-56 bg-muted-foreground/8 rounded animate-pulse" />
+                                    </div>
+                                    <div className="flex-row justify-end gap-2 hidden sm:flex">
+                                        <div className="h-8 w-40 bg-muted-foreground/8 rounded animate-pulse" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* Main content (will fade in) */}
+                <div style={{ transition: 'opacity 400ms ease', opacity: mounted ? 1 : 0 }}>
+                    <div className="flex flex-row justify-between items-center mb-3" style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '0ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
+                    <div>
+                        <h1 className="text-2xl font-bold">{page?.title ?? 'Dashboard'}</h1>
+                        <p className="opacity-65">
+                            {page?.description || 'Monitor your infrastructure in real-time'}
+                        </p>
+                        {(streamState !== 'live' || streamMessage) && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                {streamMessage ||
+                                    'Realtime stream reconnecting, showing last snapshot.'}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex flex-row items-center gap-2">
+                        {now ? (
+                            [
+                                <p className="text-sm text-muted-foreground hidden lg:flex">
+                                    Updated {new Date(now * 1000).toLocaleString()}
+                                </p>,
+                                <Badge>
+                                    {
+                                        streamState === 'live' ? <CloudLightning /> : <RotateCw />
+                                    }
+                                    {streamState === 'live' ? 'Live' : 'Snapshot'}
+                                </Badge>
+                            ]
+                        ) : null}
+                    </div>
+                </div>
+                <div>
+                    <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
+                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '0ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
+                            <Card className="border-border bg-card p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-primary/10 p-2">
+                                        <ServerIcon className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs md:text-sm text-muted-foreground">
+                                            Total Servers
+                                        </p>
+                                        <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
+                                            {overview.online} / {overview.total}
+                                        </p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '80ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
+                            <Card className="border-border bg-card p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-chart-1/10 p-2">
+                                        <Cpu className="h-5 w-5 text-chart-1" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs md:text-sm text-muted-foreground">Avg CPU</p>
+                                        <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
+                                            {overview.avgCpu.toFixed(2)}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '160ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
+                            <Card className="border-border bg-card p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-chart-3/10 p-2">
+                                        <HardDrive className="h-5 w-5 text-chart-3" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs md:text-sm text-muted-foreground">
+                                            Avg Memory
+                                        </p>
+                                        <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
+                                            {overview.avgMemory.toFixed(2)}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '240ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
+                            <Card className="border-border bg-card p-4">
+                                <div className="flex items-center h-full gap-3">
+                                    <div className="rounded-lg bg-chart-2/10 p-2">
+                                        <ArrowUpDown className="h-5 w-5 text-chart-2" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs md:text-sm text-muted-foreground">
+                                            Network Traffic
+                                        </p>
+                                        <div className="text-xs sm:text-sm lg:text-lg font-semibold text-card-foreground flex flex-col mt-1 -mb-1 sm:my-0 sm:flex-row sm:items-center sm:gap-1 h-[2rem]">
+                                            <div className="flex flex-row items-center gap-1">
+                                                <ArrowUp className="h-3 w-3 lg:h-4 lg:w-4" />
+                                                {MemoryUnit(overview.sumTX, 'kb') + '/s'}
+                                            </div>
+                                            <div className="flex flex-row items-center gap-1">
+                                                <ArrowDown className="h-3 w-3 lg:h-4 lg:w-4" />
+                                                {MemoryUnit(overview.sumRX, 'kb') + '/s'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    </div>
+                
+                    <div className="mt-4 flex gap-2 flex-row justify-between lg:items-center w-full">
+                        <ButtonGroup className="border rounded-lg">
+                            <Button
+                                variant="ghost"
+                                className={categoryFilter == null ? 'bg-accent' : ''}
+                                onClick={() => setCategoryFilter(null)}
+                            >
+                                All
+                            </Button>
+                            {categories.slice(0, 3).map((category, index) => (
+                                <Button
+                                    key={category.id}
+                                    variant="ghost"
+                                    className={cn(
+                                        index < categories.length - 1 ? 'border-e' : undefined,
+                                        categoryFilter == category.id ? 'bg-accent' : ''
+                                    )}
+                                    onClick={() => setCategoryFilter(category.id)}
+                                >
+                                    {category.name}
+                                </Button>
+                            ))}
+                            {categories.length > 3 && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            className={cn(
+                                                categoryFilter &&
+                                                    categories
+                                                        .slice(3)
+                                                        .some((item) => item.id === categoryFilter)
+                                                    ? 'bg-accent'
+                                                    : ''
+                                            )}
+                                        >
+                                            ...
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-40 mt-2 p-0 bg-background">
+                                        <div className="space-y-2">
+                                            {categories.slice(3).map((item) => (
+                                                <Button
+                                                    key={item.id}
+                                                    variant="ghost"
+                                                    className={cn(
+                                                        'w-full justify-start',
+                                                        categoryFilter == item.id ? 'bg-accent' : ''
+                                                    )}
+                                                    onClick={() => setCategoryFilter(item.id)}
+                                                >
+                                                    {item.name}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                        </ButtonGroup>
+                        <div className="flex-row justify-end gap-2">
+                            <ButtonGroup>
+                                <LayoutBtn layout={layout} onChange={setLayout} />
+                                <DetailBtn showDetails={showDetails} onChange={setShowDetails} />
+                            </ButtonGroup>
+                        </div>
+                    </div>
+                
+                    {categoryFilter == null
+                        ? categories.map((category) =>
+                              categoryServerMap[category.id] ? (
+                                  <CategorySection
+                                      key={category.id}
+                                      title={category.name}
+                                      layout={layout}
+                                      servers={categoryServerMap[category.id]}
+                                      showDetails={showDetails}
+                                      mounted={mounted}
+                                  />
+                              ) : (
+                                  <div key={category.id}>
+                                      <div className="mt-4">
+                                          <p className="mt-4 opacity-65">{category.name}</p>
+                                      </div>
+                                      <div className="mt-2">
+                                          <p className="text-sm text-muted-foreground/50">
+                                              No servers in this category.
+                                          </p>
+                                      </div>
+                                  </div>
+                              )
+                          )
+                        : categories
+                              .filter((category) => category.id === categoryFilter)
+                              .map((category) =>
+                                  categoryServerMap[category.id] ? (
+                                      <CategorySection
+                                          key={category.id}
+                                          title={category.name}
+                                          layout={layout}
+                                          servers={categoryServerMap[category.id]}
+                                          showDetails={showDetails}
+                                          mounted={mounted}
+                                      />
+                                  ) : (
+                                      <div key={category.id}>
+                                          <div className="mt-4">
+                                              <p className="mt-4 opacity-65">{category.name}</p>
+                                          </div>
+                                          <div className="mt-2">
+                                              <p className="text-sm text-muted-foreground/50">
+                                                  No servers in this category.
+                                              </p>
+                                          </div>
+                                      </div>
+                                  )
+                              )}
+                    </div>
+                </div>
+            </div>
+            <div className={"absolute bottom-3 left-1/2 transform -translate-x-1/2 text-center w-full max-w-[1800px] text-xs text-muted-foreground"}>
+                Powered by <a href="https://github.com/mosona-labs/mosona-manager" className="text-primary hover:underline">Mosona Manager</a>
+            </div>
+        </div>
+    );
+}

@@ -1,0 +1,13 @@
+::-webkit-scrollbar {
+    width: 6px;
+    background: transparent;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--card);
+    /* border-left: 6px solid var(--color-background); */
+}

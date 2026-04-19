@@ -1,5 +1,14 @@
 export type DashboardLayout = 'list' | 'list2' | 'grid';
 
+export interface ServerDisk {
+    label: string;
+    mountPoint: string;
+    usage: number;
+    used: number;
+    total: number;
+    isRoot: boolean;
+}
+
 export interface Server {
     id: number;
     name: string;
@@ -18,6 +27,7 @@ export interface Server {
     disk: number;
     disk_used: number;
     disk_total: number;
+    disks: ServerDisk[];
     uptime: string;
     networkUp: number;
     networkDown: number;

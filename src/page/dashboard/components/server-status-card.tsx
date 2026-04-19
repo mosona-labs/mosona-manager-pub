@@ -1,4 +1,4 @@
-import type { DashboardLayout, Server } from './type';
+import type { DashboardLayout, Server, ServerDisk } from './type';
 
 import {
     Cpu,
@@ -44,6 +44,76 @@ const getProgressColor = (value: number) => {
     if (value >= 80) return 'bg-red-400/50';
     if (value >= 60) return 'bg-orange-500/60';
     return 'bg-green-500/60';
+};
+
+const fallbackDisk: ServerDisk = {
+    label: 'Disk 1',
+    mountPoint: '/',
+    usage: 0,
+    used: 0,
+    total: 0,
+    isRoot: true,
+};
+
+const DiskSection = ({
+    disks,
+    showMore,
+    isOffline,
+    layout,
+}: {
+    disks: ServerDisk[];
+    showMore: boolean;
+    isOffline: boolean;
+    layout: DashboardLayout;
+}) => {
+    const disksToRender = (showMore ? disks : disks.slice(0, 1)).length
+        ? showMore
+            ? disks
+            : disks.slice(0, 1)
+        : [fallbackDisk];
+
+    return (
+        <>
+            {disksToRender.map((disk, index) => (
+                <div
+                    key={`${disk.label}-${disk.mountPoint}`}
+                    className={cn('space-y-1.5', index > 0 && 'border-t border-border/60 pt-2')}
+                >
+                    <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Database className="h-3.5 w-3.5" />
+                            <span>{showMore ? disk.label : 'Disk'}</span>
+                            {showMore && (
+                                <span
+                                    className={cn(
+                                        'rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono',
+                                        layout === 'list2' && 'xl:text-[11px]'
+                                    )}
+                                >
+                                    {disk.mountPoint}
+                                </span>
+                            )}
+                        </div>
+                        <span className="font-mono font-medium text-card-foreground">
+                            {isOffline ? '--' : disk.usage}%
+                            {showMore && (
+                                <span className="text-muted-foreground">
+                                    {' '}
+                                    ({MemoryUnit(isOffline ? 0 : disk.used, 'gb')}/
+                                    {MemoryUnit(disk.total, 'gb')})
+                                </span>
+                            )}
+                        </span>
+                    </div>
+                    <Progress
+                        value={isOffline ? 0 : disk.usage}
+                        className={layout === 'grid' ? 'h-1.5' : 'h-1'}
+                        color={getProgressColor(disk.usage)}
+                    />
+                </div>
+            ))}
+        </>
+    );
 };
 
 export default function ServerStatusCard({
@@ -234,30 +304,11 @@ export default function ServerStatusCard({
                         )}
 
                         <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    <Database className="h-3.5 w-3.5" />
-                                    <span>Disk</span>
-                                </div>
-                                <span className="font-mono font-medium text-card-foreground">
-                                    {server.status === 'offline' ? '--' : server.disk}%
-                                    {showMore && (
-                                        <span className="text-muted-foreground">
-                                            {' '}
-                                            (
-                                            {MemoryUnit(
-                                                server.status === 'offline' ? 0 : server.disk_used,
-                                                'gb'
-                                            )}
-                                            /{MemoryUnit(server.disk_total, 'gb')})
-                                        </span>
-                                    )}
-                                </span>
-                            </div>
-                            <Progress
-                                value={server.status === 'offline' ? 0 : server.disk}
-                                className="h-1.5"
-                                color={getProgressColor(server.disk)}
+                            <DiskSection
+                                disks={server.disks}
+                                showMore={showMore}
+                                isOffline={server.status === 'offline'}
+                                layout={layout}
                             />
                         </div>
 
@@ -442,31 +493,11 @@ export default function ServerStatusCard({
                                 />
                             </div>
                             <div className="space-y-1 flex-1">
-                                <div className="flex flex-col gap-1">
-                                    <div className="text-sm flex items-center gap-1.5 text-muted-foreground">
-                                        <Database className="h-3.5 w-3.5" />
-                                        <span>Disk</span>
-                                    </div>
-                                    <span className="font-mono font-medium text-card-foreground">
-                                        {server.status === 'offline' ? '--' : server.disk}%
-                                        {showMore && (
-                                            <div
-                                                className={cn(
-                                                    'text-muted-foreground text-xs',
-                                                    layout === 'list2' && 'xl:block hidden'
-                                                )}
-                                            >
-                                                {' '}
-                                                ({MemoryUnit(server.disk_used, 'gb')}/
-                                                {MemoryUnit(server.disk_total, 'gb')})
-                                            </div>
-                                        )}
-                                    </span>
-                                </div>
-                                <Progress
-                                    value={server.status === 'offline' ? 0 : server.disk}
-                                    className="h-1"
-                                    color={getProgressColor(server.disk)}
+                                <DiskSection
+                                    disks={server.disks}
+                                    showMore={showMore}
+                                    isOffline={server.status === 'offline'}
+                                    layout={layout}
                                 />
                             </div>
                             <div className="flex text-sm items-end flex-col justify-end w-28">

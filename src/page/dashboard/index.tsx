@@ -25,6 +25,7 @@ import SkeletonCard from './components/skeleton-card';
 import DetailBtn from './components/detail-btn';
 import LayoutBtn from './components/layout-btn';
 import usePublicPreview from './hook/use-public-preview';
+import { getPrimaryServerDisk, normalizeServerDisks } from './utils/disk';
 
 import { Badge } from '@/components/ui/badge.tsx';
 import { Button } from '@/components/ui/button';
@@ -176,6 +177,8 @@ function toServerCard(
     now: number | null
 ): Server {
     const info = statuses[String(server.id)];
+    const disks = normalizeServerDisks(info);
+    const primaryDisk = getPrimaryServerDisk(disks);
     const isOnline =
         info && now ? now * 1000 - new Date(info.time).getTime() < ONLINE_THRESHOLD_MS : false;
 
@@ -194,9 +197,10 @@ function toServerCard(
         swap: toPercent(info?.swap_used_mb ?? 0, info?.swap_total_mb ?? 0),
         swap_used: info?.swap_used_mb ?? 0,
         swap_total: info?.swap_total_mb ?? 0,
-        disk: toPercent(info?.disk_used_gb ?? 0, info?.disk_total_gb ?? 0),
-        disk_used: info?.disk_used_gb ?? 0,
-        disk_total: info?.disk_total_gb ?? 0,
+        disk: primaryDisk.usage,
+        disk_used: primaryDisk.used,
+        disk_total: primaryDisk.total,
+        disks,
         uptime: formatUptime(server.open_time ?? ''),
         networkUp: info?.rx_kib_s ?? 0,
         networkDown: info?.tx_kib_s ?? 0,

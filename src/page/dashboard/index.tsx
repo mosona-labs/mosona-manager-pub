@@ -230,7 +230,6 @@ export default function Dashboard() {
         categories: apiCategories,
         now,
         errorMessage,
-        streamMessage,
         retry,
     } = usePublicPreview(name);
 
@@ -461,12 +460,6 @@ export default function Dashboard() {
                                     {page?.description ||
                                         'Monitor your infrastructure in real-time'}
                                 </p>
-                                {(streamState !== 'live' || streamMessage) && (
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        {streamMessage ||
-                                            'Realtime stream reconnecting, showing last snapshot.'}
-                                    </p>
-                                )}
                             </div>
                         </div>
                         <div className="flex flex-row items-center gap-2">

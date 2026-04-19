@@ -1,1 +1,1 @@
-export const osIcons = ['arch', 'centos', 'debian', 'redhat', 'ubuntu', 'rockylinux', 'windows'];
+export const osIcons = ['arch', 'centos', 'debian', 'redhat', 'ubuntu', 'rockylinux', 'alpine', 'windows'];

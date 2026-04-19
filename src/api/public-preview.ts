@@ -128,13 +128,17 @@ export async function fetchPublicBootstrap(
         payload = null;
     }
 
-    if (!response.ok || payload?.code !== 'ok' || !payload.data) {
+    if (!response.ok || payload?.code !== 'ok' || !payload || !payload.data) {
         throw new PublicPreviewError(
             payload?.msg ?? 'Failed to load public preview data',
             response.status || 500,
             payload?.code
         );
     }
+
+    window.document.title = (payload.data.page.title ?
+        payload.data.page.title :
+        "Unname") + ' - ServerStatus'
 
     return payload.data;
 }

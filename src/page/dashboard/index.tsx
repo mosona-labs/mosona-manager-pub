@@ -557,7 +557,7 @@ export default function Dashboard() {
                 </div>
             </div>
             <div className={"absolute bottom-3 left-1/2 transform -translate-x-1/2 text-center w-full max-w-[1800px] text-xs text-muted-foreground"}>
-                Powered by <a href="https://github.com/mosona-labs/mosona-manager" className="text-primary hover:underline">Mosona Manager</a>
+                Powered by <a href="https://github.com/mosona-labs/mosona-manager" target="_blank" className="text-primary hover:underline">Mosona Manager</a>
             </div>
         </div>
     );

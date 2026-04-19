@@ -144,7 +144,12 @@ export default function ServerStatusCard({
                                 <Tags server={server} />
                             </div>
                         </div>
-                        <Badge className={cn('text-xs font-medium text-foreground', STATUS_COLORS[server.status])}>
+                        <Badge
+                            className={cn(
+                                'text-xs font-medium text-foreground',
+                                STATUS_COLORS[server.status]
+                            )}
+                        >
                             {server.status}
                         </Badge>
                     </div>

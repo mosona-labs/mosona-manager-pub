@@ -1,5 +1,10 @@
-import type {PublicMonitor, ServerStatus, Category} from '@/api/public-preview';
-import type {DashboardLayout, Server} from './components/type';
+import type {
+    Category,
+    PublicMonitor,
+    PublicPageSummary,
+    ServerStatus,
+} from '@/api/public-preview';
+import type { DashboardLayout, Server } from './components/type';
 
 import {
     ArrowDown,
@@ -12,8 +17,8 @@ import {
     Server as ServerIcon,
     WifiOff,
 } from 'lucide-react';
-import {useEffect, useMemo, useState} from 'react';
-import {useParams} from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 
 import CategorySection from './components/category';
 import SkeletonCard from './components/skeleton-card';
@@ -21,14 +26,14 @@ import DetailBtn from './components/detail-btn';
 import LayoutBtn from './components/layout-btn';
 import usePublicPreview from './hook/use-public-preview';
 
-import {Card} from '@/components/ui/card';
-import {Button} from '@/components/ui/button';
-import {ButtonGroup} from '@/components/ui/button-group';
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
-import {cn} from '@/lib/utils';
-import {formatUptime} from '@/utils/time';
-import {MemoryUnit} from '@/utils/unit';
-import {Badge} from "@/components/ui/badge.tsx";
+import { Badge } from '@/components/ui/badge.tsx';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import { Card } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { formatUptime } from '@/utils/time';
+import { MemoryUnit } from '@/utils/unit';
 
 const ONLINE_THRESHOLD_MS = 5_000;
 const STORAGE_LAYOUT_KEY = 'mosona-public-dashboard-layout';
@@ -61,6 +66,108 @@ function toPercent(used: number, total: number) {
 
 function categoryLabel(category: number) {
     return category > 0 ? `Category ${category}` : 'Uncategorized';
+}
+
+function getTeamInitial(page: PublicPageSummary | null) {
+    const source = page?.team_name?.trim() || page?.title?.trim() || 'Dashboard';
+    const match = source.match(/[A-Za-z0-9]/);
+
+    return match ? match[0]!.toUpperCase() : 'D';
+}
+
+function normalizeHexColor(color?: string | null) {
+    if (!color) {
+        return null;
+    }
+
+    const value = color.trim();
+    const shortHex = /^#([0-9a-fA-F]{3})$/;
+    const longHex = /^#([0-9a-fA-F]{6})$/;
+
+    if (shortHex.test(value)) {
+        const [, hex] = value.match(shortHex)!;
+        return `#${hex
+            .split('')
+            .map((char) => char + char)
+            .join('')}`;
+    }
+
+    if (longHex.test(value)) {
+        return value;
+    }
+
+    return null;
+}
+
+function getAvatarTextColor(backgroundColor?: string | null) {
+    const normalized = normalizeHexColor(backgroundColor);
+
+    if (!normalized) {
+        return '#ffffff';
+    }
+
+    const red = parseInt(normalized.slice(1, 3), 16);
+    const green = parseInt(normalized.slice(3, 5), 16);
+    const blue = parseInt(normalized.slice(5, 7), 16);
+
+    // Use the inverted color as the base, then bias it slightly for readability.
+    const inverted = {
+        red: 255 - red,
+        green: 255 - green,
+        blue: 255 - blue,
+    };
+    const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+    const bias = luminance > 186 ? 32 : -32;
+    const adjust = (channel: number) => Math.min(255, Math.max(0, channel + bias));
+
+    return `rgb(${adjust(inverted.red)}, ${adjust(inverted.green)}, ${adjust(inverted.blue)})`;
+}
+
+function resolveAvatarUrl(rawUrl?: string | null) {
+    const value = rawUrl?.trim();
+
+    if (!value) {
+        return null;
+    }
+
+    try {
+        return new URL(value, window.location.origin).toString();
+    } catch {
+        return value;
+    }
+}
+
+function TeamAvatar({ page }: { page: PublicPageSummary | null }) {
+    const [imageError, setImageError] = useState(false);
+    const avatarUrl = resolveAvatarUrl(page?.team_avatar);
+    const fallbackLabel = getTeamInitial(page);
+    const backgroundColor = normalizeHexColor(page?.team_color) || '#6b7280';
+    const textColor = getAvatarTextColor(backgroundColor);
+
+    useEffect(() => {
+        setImageError(false);
+    }, [avatarUrl]);
+
+    if (avatarUrl && !imageError) {
+        return (
+            <img
+                src={avatarUrl}
+                alt={page?.team_name?.trim() || page?.title?.trim() || 'Team avatar'}
+                className="h-12 w-12 shrink-0 rounded-xl object-cover shadow-sm ring-1 ring-black/5"
+                onError={() => setImageError(true)}
+            />
+        );
+    }
+
+    return (
+        <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-sm ring-1 ring-black/5"
+            style={{ backgroundColor, color: textColor }}
+            aria-label={page?.team_name?.trim() || page?.title?.trim() || 'Team avatar'}
+        >
+            {fallbackLabel}
+        </div>
+    );
 }
 
 function toServerCard(
@@ -176,7 +283,7 @@ export default function Dashboard() {
 
         // Convert and sort by sort then id
         return Array.from(map.values())
-            .sort((a, b) => (a.sort - b.sort) || (a.id - b.id))
+            .sort((a, b) => a.sort - b.sort || a.id - b.id)
             .map(({ id, name }) => ({ id, name }));
     }, [servers, apiCategories]);
 
@@ -278,7 +385,7 @@ export default function Dashboard() {
 
     return (
         <div className="w-full p-5 h-full overflow-y-auto pb-24 min-h-screen relative flex justify-center">
-                <div className="w-full max-w-[1800px] relative">
+            <div className="w-full max-w-[1800px] relative">
                 {/* Skeleton overlay */}
                 {showSkeleton ? (
                     <div
@@ -286,10 +393,13 @@ export default function Dashboard() {
                         style={{ opacity: bootstrapState === 'loading' ? 1 : 0 }}
                     >
                         <div className="w-full">
-                            <div className="flex flex-row justify-between items-center mb-3">
-                                <div>
-                                    <div className="h-8 w-48 bg-muted-foreground/10 rounded animate-pulse" />
-                                    <div className="h-4 w-64 bg-muted-foreground/8 rounded mt-2 animate-pulse" />
+                            <div className="mb-3 flex flex-row items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-12 w-12 rounded-xl bg-muted-foreground/10 animate-pulse" />
+                                    <div>
+                                        <div className="h-8 w-48 bg-muted-foreground/10 rounded animate-pulse" />
+                                        <div className="h-4 w-64 bg-muted-foreground/8 rounded mt-2 animate-pulse" />
+                                    </div>
                                 </div>
                                 <div className="flex flex-row gap-2">
                                     <div className="h-6 w-28 bg-muted-foreground/8 rounded animate-pulse" />
@@ -298,7 +408,10 @@ export default function Dashboard() {
                             <div>
                                 <div className="grid gap-4 grid-cols-2 xl:grid-cols-4 mb-4">
                                     {Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="border-border bg-card p-4 animate-pulse rounded-xl border">
+                                        <div
+                                            key={i}
+                                            className="border-border bg-card p-4 animate-pulse rounded-xl border"
+                                        >
                                             <div className="flex items-center gap-3">
                                                 <div className="rounded-lg bg-muted-foreground/10 p-2 h-10 w-10" />
                                                 <div>
@@ -331,206 +444,229 @@ export default function Dashboard() {
 
                 {/* Main content (will fade in) */}
                 <div style={{ transition: 'opacity 400ms ease', opacity: mounted ? 1 : 0 }}>
-                    <div className="flex flex-row justify-between items-center mb-3" style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '0ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
+                    <div
+                        className="mb-3 flex flex-row items-center justify-between"
+                        style={{
+                            transition: 'opacity 400ms ease, transform 400ms ease',
+                            transitionDelay: '0ms',
+                            opacity: mounted ? 1 : 0,
+                            transform: mounted ? 'none' : 'translateY(6px)',
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <TeamAvatar page={page} />
+                            <div>
+                                <h1 className="text-2xl font-bold">{page?.title ?? 'Dashboard'}</h1>
+                                <p className="opacity-65">
+                                    {page?.description ||
+                                        'Monitor your infrastructure in real-time'}
+                                </p>
+                                {(streamState !== 'live' || streamMessage) && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {streamMessage ||
+                                            'Realtime stream reconnecting, showing last snapshot.'}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex flex-row items-center gap-2">
+                            {now ? (
+                                <>
+                                    <p className="text-sm text-muted-foreground hidden lg:flex">
+                                        Updated {new Date(now * 1000).toLocaleString()}
+                                    </p>
+                                    <Badge>
+                                        {streamState === 'live' ? <CloudLightning /> : <RotateCw />}
+                                        {streamState === 'live' ? 'Live' : 'Snapshot'}
+                                    </Badge>
+                                </>
+                            ) : null}
+                        </div>
+                    </div>
+
                     <div>
-                        <h1 className="text-2xl font-bold">{page?.title ?? 'Dashboard'}</h1>
-                        <p className="opacity-65">
-                            {page?.description || 'Monitor your infrastructure in real-time'}
-                        </p>
-                        {(streamState !== 'live' || streamMessage) && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                                {streamMessage ||
-                                    'Realtime stream reconnecting, showing last snapshot.'}
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex flex-row items-center gap-2">
-                        {now ? (
-                            [
-                                <p className="text-sm text-muted-foreground hidden lg:flex">
-                                    Updated {new Date(now * 1000).toLocaleString()}
-                                </p>,
-                                <Badge>
-                                    {
-                                        streamState === 'live' ? <CloudLightning /> : <RotateCw />
-                                    }
-                                    {streamState === 'live' ? 'Live' : 'Snapshot'}
-                                </Badge>
-                            ]
-                        ) : null}
-                    </div>
-                </div>
-                <div>
-                    <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
-                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '0ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
-                            <Card className="border-border bg-card p-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-primary/10 p-2">
-                                        <ServerIcon className="h-5 w-5 text-primary" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs md:text-sm text-muted-foreground">
-                                            Total Servers
-                                        </p>
-                                        <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
-                                            {overview.online} / {overview.total}
-                                        </p>
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '80ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
-                            <Card className="border-border bg-card p-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-chart-1/10 p-2">
-                                        <Cpu className="h-5 w-5 text-chart-1" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs md:text-sm text-muted-foreground">Avg CPU</p>
-                                        <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
-                                            {overview.avgCpu.toFixed(2)}%
-                                        </p>
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '160ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
-                            <Card className="border-border bg-card p-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-chart-3/10 p-2">
-                                        <HardDrive className="h-5 w-5 text-chart-3" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs md:text-sm text-muted-foreground">
-                                            Avg Memory
-                                        </p>
-                                        <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
-                                            {overview.avgMemory.toFixed(2)}%
-                                        </p>
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-                        <div style={{ transition: 'opacity 400ms ease, transform 400ms ease', transitionDelay: '240ms', opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(6px)' }}>
-                            <Card className="border-border bg-card p-4">
-                                <div className="flex items-center h-full gap-3">
-                                    <div className="rounded-lg bg-chart-2/10 p-2">
-                                        <ArrowUpDown className="h-5 w-5 text-chart-2" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs md:text-sm text-muted-foreground">
-                                            Network Traffic
-                                        </p>
-                                        <div className="text-xs sm:text-sm lg:text-lg font-semibold text-card-foreground flex flex-col mt-1 -mb-1 sm:my-0 sm:flex-row sm:items-center sm:gap-1 h-[2rem]">
-                                            <div className="flex flex-row items-center gap-1">
-                                                <ArrowUp className="h-3 w-3 lg:h-4 lg:w-4" />
-                                                {MemoryUnit(overview.sumTX, 'kb') + '/s'}
-                                            </div>
-                                            <div className="flex flex-row items-center gap-1">
-                                                <ArrowDown className="h-3 w-3 lg:h-4 lg:w-4" />
-                                                {MemoryUnit(overview.sumRX, 'kb') + '/s'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-                    </div>
-                
-                    <div className="mt-4 flex gap-2 flex-row justify-between lg:items-center w-full">
-                        <ButtonGroup className="border rounded-lg">
-                            <Button
-                                variant="ghost"
-                                className={categoryFilter == null ? 'bg-accent' : ''}
-                                onClick={() => setCategoryFilter(null)}
+                        <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
+                            <div
+                                style={{
+                                    transition: 'opacity 400ms ease, transform 400ms ease',
+                                    transitionDelay: '0ms',
+                                    opacity: mounted ? 1 : 0,
+                                    transform: mounted ? 'none' : 'translateY(6px)',
+                                }}
                             >
-                                All
-                            </Button>
-                            {categories.slice(0, 3).map((category, index) => (
-                                <Button
-                                    key={category.id}
-                                    variant="ghost"
-                                    className={cn(
-                                        index < categories.length - 1 ? 'border-e' : undefined,
-                                        categoryFilter == category.id ? 'bg-accent' : ''
-                                    )}
-                                    onClick={() => setCategoryFilter(category.id)}
-                                >
-                                    {category.name}
-                                </Button>
-                            ))}
-                            {categories.length > 3 && (
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            className={cn(
-                                                categoryFilter &&
-                                                    categories
-                                                        .slice(3)
-                                                        .some((item) => item.id === categoryFilter)
-                                                    ? 'bg-accent'
-                                                    : ''
-                                            )}
-                                        >
-                                            ...
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-40 mt-2 p-0 bg-background">
-                                        <div className="space-y-2">
-                                            {categories.slice(3).map((item) => (
-                                                <Button
-                                                    key={item.id}
-                                                    variant="ghost"
-                                                    className={cn(
-                                                        'w-full justify-start',
-                                                        categoryFilter == item.id ? 'bg-accent' : ''
-                                                    )}
-                                                    onClick={() => setCategoryFilter(item.id)}
-                                                >
-                                                    {item.name}
-                                                </Button>
-                                            ))}
+                                <Card className="border-border bg-card p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-primary/10 p-2">
+                                            <ServerIcon className="h-5 w-5 text-primary" />
                                         </div>
-                                    </PopoverContent>
-                                </Popover>
-                            )}
-                        </ButtonGroup>
-                        <div className="flex-row justify-end gap-2">
-                            <ButtonGroup>
-                                <LayoutBtn layout={layout} onChange={setLayout} />
-                                <DetailBtn showDetails={showDetails} onChange={setShowDetails} />
-                            </ButtonGroup>
+                                        <div>
+                                            <p className="text-xs md:text-sm text-muted-foreground">
+                                                Total Servers
+                                            </p>
+                                            <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
+                                                {overview.online} / {overview.total}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+                            <div
+                                style={{
+                                    transition: 'opacity 400ms ease, transform 400ms ease',
+                                    transitionDelay: '80ms',
+                                    opacity: mounted ? 1 : 0,
+                                    transform: mounted ? 'none' : 'translateY(6px)',
+                                }}
+                            >
+                                <Card className="border-border bg-card p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-chart-1/10 p-2">
+                                            <Cpu className="h-5 w-5 text-chart-1" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs md:text-sm text-muted-foreground">
+                                                Avg CPU
+                                            </p>
+                                            <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
+                                                {overview.avgCpu.toFixed(2)}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+                            <div
+                                style={{
+                                    transition: 'opacity 400ms ease, transform 400ms ease',
+                                    transitionDelay: '160ms',
+                                    opacity: mounted ? 1 : 0,
+                                    transform: mounted ? 'none' : 'translateY(6px)',
+                                }}
+                            >
+                                <Card className="border-border bg-card p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-chart-3/10 p-2">
+                                            <HardDrive className="h-5 w-5 text-chart-3" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs md:text-sm text-muted-foreground">
+                                                Avg Memory
+                                            </p>
+                                            <p className="text-xl md:text-2xl font-semibold text-card-foreground h-[2rem]">
+                                                {overview.avgMemory.toFixed(2)}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+                            <div
+                                style={{
+                                    transition: 'opacity 400ms ease, transform 400ms ease',
+                                    transitionDelay: '240ms',
+                                    opacity: mounted ? 1 : 0,
+                                    transform: mounted ? 'none' : 'translateY(6px)',
+                                }}
+                            >
+                                <Card className="border-border bg-card p-4">
+                                    <div className="flex items-center h-full gap-3">
+                                        <div className="rounded-lg bg-chart-2/10 p-2">
+                                            <ArrowUpDown className="h-5 w-5 text-chart-2" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs md:text-sm text-muted-foreground">
+                                                Network Traffic
+                                            </p>
+                                            <div className="text-xs sm:text-sm lg:text-lg font-semibold text-card-foreground flex flex-col mt-1 -mb-1 sm:my-0 sm:flex-row sm:items-center sm:gap-1 h-[2rem]">
+                                                <div className="flex flex-row items-center gap-1">
+                                                    <ArrowUp className="h-3 w-3 lg:h-4 lg:w-4" />
+                                                    {MemoryUnit(overview.sumTX, 'kb') + '/s'}
+                                                </div>
+                                                <div className="flex flex-row items-center gap-1">
+                                                    <ArrowDown className="h-3 w-3 lg:h-4 lg:w-4" />
+                                                    {MemoryUnit(overview.sumRX, 'kb') + '/s'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
                         </div>
-                    </div>
-                
-                    {categoryFilter == null
-                        ? categories.map((category) =>
-                              categoryServerMap[category.id] ? (
-                                  <CategorySection
-                                      key={category.id}
-                                      title={category.name}
-                                      layout={layout}
-                                      servers={categoryServerMap[category.id]}
-                                      showDetails={showDetails}
-                                      mounted={mounted}
-                                  />
-                              ) : (
-                                  <div key={category.id}>
-                                      <div className="mt-4">
-                                          <p className="mt-4 opacity-65">{category.name}</p>
-                                      </div>
-                                      <div className="mt-2">
-                                          <p className="text-sm text-muted-foreground/50">
-                                              No servers in this category.
-                                          </p>
-                                      </div>
-                                  </div>
-                              )
-                          )
-                        : categories
-                              .filter((category) => category.id === categoryFilter)
-                              .map((category) =>
+
+                        <div className="mt-4 flex gap-2 flex-row justify-between lg:items-center w-full">
+                            <ButtonGroup className="border rounded-lg">
+                                <Button
+                                    variant="ghost"
+                                    className={categoryFilter == null ? 'bg-accent' : ''}
+                                    onClick={() => setCategoryFilter(null)}
+                                >
+                                    All
+                                </Button>
+                                {categories.slice(0, 3).map((category, index) => (
+                                    <Button
+                                        key={category.id}
+                                        variant="ghost"
+                                        className={cn(
+                                            index < categories.length - 1 ? 'border-e' : undefined,
+                                            categoryFilter == category.id ? 'bg-accent' : ''
+                                        )}
+                                        onClick={() => setCategoryFilter(category.id)}
+                                    >
+                                        {category.name}
+                                    </Button>
+                                ))}
+                                {categories.length > 3 && (
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                className={cn(
+                                                    categoryFilter &&
+                                                        categories
+                                                            .slice(3)
+                                                            .some(
+                                                                (item) => item.id === categoryFilter
+                                                            )
+                                                        ? 'bg-accent'
+                                                        : ''
+                                                )}
+                                            >
+                                                ...
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-40 mt-2 p-0 bg-background">
+                                            <div className="space-y-2">
+                                                {categories.slice(3).map((item) => (
+                                                    <Button
+                                                        key={item.id}
+                                                        variant="ghost"
+                                                        className={cn(
+                                                            'w-full justify-start',
+                                                            categoryFilter == item.id
+                                                                ? 'bg-accent'
+                                                                : ''
+                                                        )}
+                                                        onClick={() => setCategoryFilter(item.id)}
+                                                    >
+                                                        {item.name}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                )}
+                            </ButtonGroup>
+                            <div className="flex-row justify-end gap-2">
+                                <ButtonGroup>
+                                    <LayoutBtn layout={layout} onChange={setLayout} />
+                                    <DetailBtn
+                                        showDetails={showDetails}
+                                        onChange={setShowDetails}
+                                    />
+                                </ButtonGroup>
+                            </div>
+                        </div>
+
+                        {categoryFilter == null
+                            ? categories.map((category) =>
                                   categoryServerMap[category.id] ? (
                                       <CategorySection
                                           key={category.id}
@@ -552,12 +688,44 @@ export default function Dashboard() {
                                           </div>
                                       </div>
                                   )
-                              )}
+                              )
+                            : categories
+                                  .filter((category) => category.id === categoryFilter)
+                                  .map((category) =>
+                                      categoryServerMap[category.id] ? (
+                                          <CategorySection
+                                              key={category.id}
+                                              title={category.name}
+                                              layout={layout}
+                                              servers={categoryServerMap[category.id]}
+                                              showDetails={showDetails}
+                                              mounted={mounted}
+                                          />
+                                      ) : (
+                                          <div key={category.id}>
+                                              <div className="mt-4">
+                                                  <p className="mt-4 opacity-65">{category.name}</p>
+                                              </div>
+                                              <div className="mt-2">
+                                                  <p className="text-sm text-muted-foreground/50">
+                                                      No servers in this category.
+                                                  </p>
+                                              </div>
+                                          </div>
+                                      )
+                                  )}
                     </div>
                 </div>
             </div>
-            <div className={"absolute bottom-3 left-1/2 transform -translate-x-1/2 text-center w-full max-w-[1800px] text-xs text-muted-foreground"}>
-                Powered by <a href="https://github.com/mosona-labs/mosona-manager" target="_blank" className="text-primary hover:underline">Mosona Manager</a>
+            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 text-center w-full max-w-[1800px] text-xs text-muted-foreground">
+                Powered by{' '}
+                <a
+                    href="https://github.com/mosona-labs/mosona-manager"
+                    target="_blank"
+                    className="text-primary hover:underline"
+                >
+                    Mosona Manager
+                </a>
             </div>
         </div>
     );

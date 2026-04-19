@@ -37,4 +37,3 @@ export default function SkeletonCard({ layout }: { layout: DashboardLayout }) {
         </Card>
     );
 }
-

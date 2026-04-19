@@ -3,6 +3,9 @@ export type PublicPageSummary = {
     name?: string | null;
     domain?: string | null;
     description?: string | null;
+    team_name?: string | null;
+    team_color?: string | null;
+    team_avatar?: string | null;
 };
 
 export type PublicMonitor = {
@@ -136,9 +139,8 @@ export async function fetchPublicBootstrap(
         );
     }
 
-    window.document.title = (payload.data.page.title ?
-        payload.data.page.title :
-        "Unname") + ' - ServerStatus'
+    window.document.title =
+        (payload.data.page.title ? payload.data.page.title : 'Unname') + ' - ServerStatus';
 
     return payload.data;
 }

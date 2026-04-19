@@ -19,6 +19,11 @@ export default defineConfig({
                 changeOrigin: true,
                 ws: true,
             },
+            '/avatars': {
+                target: 'http://localhost:3214',
+                changeOrigin: true,
+                ws: true,
+            }
         },
     },
     build: {

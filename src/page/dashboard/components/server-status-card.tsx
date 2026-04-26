@@ -71,6 +71,45 @@ const DiskSection = ({
             ? disks
             : disks.slice(0, 1)
         : [fallbackDisk];
+    const primaryDisk = disks[0] || fallbackDisk;
+
+    if (layout !== 'grid') {
+        return (
+            <div className="space-y-1 min-w-0">
+                <div className="flex flex-col gap-1">
+                    <div className="text-sm flex items-center gap-1.5 text-muted-foreground min-w-0">
+                        <Database className="h-3.5 w-3.5 shrink-0" />
+                        <span>Disk</span>
+                        {disks.length > 1 && (
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
+                                +{disks.length - 1}
+                            </span>
+                        )}
+                    </div>
+                    <span className="font-mono font-medium text-card-foreground">
+                        {isOffline ? '--' : primaryDisk.usage}%
+                        {showMore && (
+                            <div
+                                className={cn(
+                                    'text-muted-foreground text-xs truncate',
+                                    layout === 'list2' && 'xl:block hidden'
+                                )}
+                            >
+                                {primaryDisk.mountPoint} ·{' '}
+                                {MemoryUnit(isOffline ? 0 : primaryDisk.used, 'gb')}/
+                                {MemoryUnit(primaryDisk.total, 'gb')}
+                            </div>
+                        )}
+                    </span>
+                </div>
+                <Progress
+                    value={isOffline ? 0 : primaryDisk.usage}
+                    className="h-1"
+                    color={getProgressColor(primaryDisk.usage)}
+                />
+            </div>
+        );
+    }
 
     return (
         <>
@@ -84,12 +123,7 @@ const DiskSection = ({
                             <Database className="h-3.5 w-3.5" />
                             <span>{showMore ? disk.label : 'Disk'}</span>
                             {showMore && (
-                                <span
-                                    className={cn(
-                                        'rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono',
-                                        layout === 'list2' && 'xl:text-[11px]'
-                                    )}
-                                >
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
                                     {disk.mountPoint}
                                 </span>
                             )}
@@ -492,7 +526,7 @@ export default function ServerStatusCard({
                                     color={getProgressColor(server.memory)}
                                 />
                             </div>
-                            <div className="space-y-1 flex-1">
+                            <div className="space-y-1 flex-1 min-w-0">
                                 <DiskSection
                                     disks={server.disks}
                                     showMore={showMore}

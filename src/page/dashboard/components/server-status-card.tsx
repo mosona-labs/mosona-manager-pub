@@ -223,7 +223,7 @@ export default function ServerStatusCard({
     return (
         <Card
             className={cn(
-                'border-border bg-card p-5 transition-all hover:border-primary/50 cursor-pointer h-full',
+                'border-border bg-card p-5 transition-all hover:border-primary/50 h-full',
                 layout !== 'grid' && 'py-3.5 gap-3.5'
             )}
             onMouseEnter={() => setShowMoreBtn(true)}

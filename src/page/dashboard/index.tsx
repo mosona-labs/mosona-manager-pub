@@ -13,8 +13,10 @@ import {
     CloudLightning,
     Cpu,
     HardDrive,
+    Moon,
     RotateCw,
     Server as ServerIcon,
+    Sun,
     WifiOff,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,6 +34,8 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Card } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 import { formatUptime } from '@/utils/time';
 import { MemoryUnit } from '@/utils/unit';
@@ -67,6 +71,18 @@ function toPercent(used: number, total: number) {
 
 function categoryLabel(category: number) {
     return category > 0 ? `Category ${category}` : 'Uncategorized';
+}
+
+function isDefaultCategory(category: { name: string }) {
+    return category.name.trim().toLowerCase() === 'default';
+}
+
+function getSystemPrefersDark() {
+    return (
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
 }
 
 function getTeamInitial(page: PublicPageSummary | null) {
@@ -237,6 +253,7 @@ export default function Dashboard() {
         retry,
     } = usePublicPreview(name);
 
+    const { theme, setTheme } = useTheme();
     const [layout, setLayout] = useState<DashboardLayout>(() => readLayoutPreference());
     const [showDetails, setShowDetails] = useState(() => readDetailsPreference());
     // Mounted controls fade-in animations for real content.
@@ -244,10 +261,26 @@ export default function Dashboard() {
     // Control skeleton visibility so it can fade out smoothly.
     const [showSkeleton, setShowSkeleton] = useState(bootstrapState === 'loading');
     const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
+    const [prefersDark, setPrefersDark] = useState(getSystemPrefersDark);
+    const isDarkMode = theme === 'dark' || (theme === 'system' && prefersDark);
 
     useEffect(() => {
         localStorage.setItem(STORAGE_LAYOUT_KEY, layout);
     }, [layout]);
+
+    useEffect(() => {
+        if (typeof window.matchMedia !== 'function') {
+            return;
+        }
+
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = () => setPrefersDark(media.matches);
+
+        handleChange();
+        media.addEventListener('change', handleChange);
+
+        return () => media.removeEventListener('change', handleChange);
+    }, []);
 
     useEffect(() => {
         localStorage.setItem(STORAGE_DETAILS_KEY, String(showDetails));
@@ -305,20 +338,28 @@ export default function Dashboard() {
         return map;
     }, [now, servers, status]);
 
+    const visibleCategories = useMemo(() => {
+        return categories.filter((category) => {
+            const categoryServers = categoryServerMap[category.id] ?? [];
+
+            return !isDefaultCategory(category) || categoryServers.length > 0;
+        });
+    }, [categories, categoryServerMap]);
+
     useEffect(() => {
         if (
             categoryFilter !== null &&
-            !categories.some((category) => category.id === categoryFilter)
+            !visibleCategories.some((category) => category.id === categoryFilter)
         ) {
             setCategoryFilter(null);
         }
-    }, [categories, categoryFilter]);
+    }, [visibleCategories, categoryFilter]);
 
     const visibleServers = useMemo(() => {
         return categoryFilter == null
-            ? categories.flatMap((category) => categoryServerMap[category.id] ?? [])
+            ? visibleCategories.flatMap((category) => categoryServerMap[category.id] ?? [])
             : (categoryServerMap[categoryFilter] ?? []);
-    }, [categories, categoryFilter, categoryServerMap]);
+    }, [visibleCategories, categoryFilter, categoryServerMap]);
 
     const overview = useMemo(() => {
         const total = visibleServers.length;
@@ -478,6 +519,31 @@ export default function Dashboard() {
                                     </Badge>
                                 </>
                             ) : null}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon-sm"
+                                        className="shrink-0"
+                                        aria-label={
+                                            isDarkMode
+                                                ? 'Switch to light mode'
+                                                : 'Switch to dark mode'
+                                        }
+                                        onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
+                                    >
+                                        {isDarkMode ? (
+                                            <Sun className="h-4 w-4" />
+                                        ) : (
+                                            <Moon className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    {isDarkMode ? 'Light mode' : 'Dark mode'}
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
                     </div>
 
@@ -597,12 +663,14 @@ export default function Dashboard() {
                                 >
                                     All
                                 </Button>
-                                {categories.slice(0, 3).map((category, index) => (
+                                {visibleCategories.slice(0, 3).map((category, index) => (
                                     <Button
                                         key={category.id}
                                         variant="ghost"
                                         className={cn(
-                                            index < categories.length - 1 ? 'border-e' : undefined,
+                                            index < visibleCategories.length - 1
+                                                ? 'border-e'
+                                                : undefined,
                                             categoryFilter == category.id ? 'bg-accent' : ''
                                         )}
                                         onClick={() => setCategoryFilter(category.id)}
@@ -610,14 +678,14 @@ export default function Dashboard() {
                                         {category.name}
                                     </Button>
                                 ))}
-                                {categories.length > 3 && (
+                                {visibleCategories.length > 3 && (
                                     <Popover>
                                         <PopoverTrigger asChild>
                                             <Button
                                                 variant="ghost"
                                                 className={cn(
                                                     categoryFilter &&
-                                                        categories
+                                                        visibleCategories
                                                             .slice(3)
                                                             .some(
                                                                 (item) => item.id === categoryFilter
@@ -631,7 +699,7 @@ export default function Dashboard() {
                                         </PopoverTrigger>
                                         <PopoverContent className="w-40 mt-2 p-0 bg-background">
                                             <div className="space-y-2">
-                                                {categories.slice(3).map((item) => (
+                                                {visibleCategories.slice(3).map((item) => (
                                                     <Button
                                                         key={item.id}
                                                         variant="ghost"
@@ -663,7 +731,7 @@ export default function Dashboard() {
                         </div>
 
                         {categoryFilter == null
-                            ? categories.map((category) =>
+                            ? visibleCategories.map((category) =>
                                   categoryServerMap[category.id] ? (
                                       <CategorySection
                                           key={category.id}
@@ -686,7 +754,7 @@ export default function Dashboard() {
                                       </div>
                                   )
                               )
-                            : categories
+                            : visibleCategories
                                   .filter((category) => category.id === categoryFilter)
                                   .map((category) =>
                                       categoryServerMap[category.id] ? (

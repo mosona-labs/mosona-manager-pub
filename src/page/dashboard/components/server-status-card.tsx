@@ -682,12 +682,12 @@ function Details({
                 <div className="flex items-center">
                     <div className="flex items-center gap-1">
                         <HardDriveUpload className="h-3 w-3" />
-                        <span className="font-mono">{server.diskReadIOPS}</span>
+                        <span className="font-mono">{server.diskReadIOPS.toFixed(2)}</span>
                         <span className="text-muted-foreground">ps</span>
                     </div>
                     <div className="flex items-center gap-1 ms-3">
                         <HardDriveDownload className="h-3 w-3" />
-                        <span className="font-mono">{server.diskWriteIOPS}</span>
+                        <span className="font-mono">{server.diskWriteIOPS.toFixed(2)}</span>
                         <span className="text-muted-foreground">ps</span>
                     </div>
                 </div>

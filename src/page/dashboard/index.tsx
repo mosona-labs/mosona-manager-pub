@@ -560,7 +560,7 @@ export default function Dashboard() {
                                 <Card className="border-border bg-card p-4">
                                     <div className="flex items-center gap-3">
                                         <div className="rounded-lg bg-primary/10 p-2">
-                                            <ServerIcon className="h-5 w-5 text-primary" />
+                                            <ServerIcon className="h-3 w-3 md:h-5 md:w-5 text-primary" />
                                         </div>
                                         <div>
                                             <p className="text-xs md:text-sm text-muted-foreground">
@@ -584,7 +584,7 @@ export default function Dashboard() {
                                 <Card className="border-border bg-card p-4">
                                     <div className="flex items-center gap-3">
                                         <div className="rounded-lg bg-chart-1/10 p-2">
-                                            <Cpu className="h-5 w-5 text-chart-1" />
+                                            <Cpu className="h-3 w-3 md:h-5 md:w-5 text-chart-1" />
                                         </div>
                                         <div>
                                             <p className="text-xs md:text-sm text-muted-foreground">
@@ -608,7 +608,7 @@ export default function Dashboard() {
                                 <Card className="border-border bg-card p-4">
                                     <div className="flex items-center gap-3">
                                         <div className="rounded-lg bg-chart-3/10 p-2">
-                                            <HardDrive className="h-5 w-5 text-chart-3" />
+                                            <HardDrive className="h-3 w-3 md:h-5 md:w-5 text-chart-3" />
                                         </div>
                                         <div>
                                             <p className="text-xs md:text-sm text-muted-foreground">
@@ -632,22 +632,22 @@ export default function Dashboard() {
                                 <Card className="border-border bg-card p-4">
                                     <div className="flex items-center h-full gap-3">
                                         <div className="rounded-lg bg-chart-2/10 p-2">
-                                            <ArrowUpDown className="h-5 w-5 text-chart-2" />
+                                            <ArrowUpDown className="h-3 w-3 md:h-5 md:w-5 text-chart-2" />
                                         </div>
                                         <div>
                                             <p className="text-xs md:text-sm text-muted-foreground">
                                                 Network Traffic
                                             </p>
-                                            <div className="text-xs sm:text-sm lg:text-lg font-semibold text-card-foreground flex flex-col mt-1 -mb-1 sm:my-0 sm:flex-row sm:items-center sm:gap-1 h-[2rem]">
-                                                <div className="flex flex-row items-center gap-1">
-                                                    <ArrowUp className="h-3 w-3 lg:h-4 lg:w-4" />
+                                            <p className="text-xs 2xl:text-sm font-semibold text-card-foreground flex flex-col mt-1 -mb-1 2xl:my-0 2xl:flex-row 2xl:items-center 2xl:gap-1 h-[2rem]">
+                                                <div className={'flex flex-row items-center gap-1'}>
+                                                    <ArrowUp className="h-3 w-3 2xl:h-4 2xl:w-4" />
                                                     {MemoryUnit(overview.sumTX, 'kb') + '/s'}
                                                 </div>
-                                                <div className="flex flex-row items-center gap-1">
-                                                    <ArrowDown className="h-3 w-3 lg:h-4 lg:w-4" />
+                                                <div className={'flex flex-row items-center gap-1'}>
+                                                    <ArrowDown className="h-3 w-3 2xl:h-4 2xl:w-4" />
                                                     {MemoryUnit(overview.sumRX, 'kb') + '/s'}
                                                 </div>
-                                            </div>
+                                            </p>
                                         </div>
                                     </div>
                                 </Card>

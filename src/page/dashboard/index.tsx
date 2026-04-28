@@ -396,7 +396,7 @@ export default function Dashboard() {
         let totalBandwidthTxMb = 0;
 
         for (const server of visibleServers) {
-            const coreCount = server.core_c ?? server.core_t;
+            const coreCount = server.core_t ?? server.core_c;
             if (typeof coreCount === 'number') {
                 totalCpuCores += coreCount;
                 hasCpuCores = true;

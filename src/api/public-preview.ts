@@ -81,6 +81,7 @@ export type PublicBootstrapResponse = {
 
 export type PublicSSEPayload = {
     servers: PublicMonitor[];
+    categories?: Category[];
     status: StatusMap;
     now: number;
 };

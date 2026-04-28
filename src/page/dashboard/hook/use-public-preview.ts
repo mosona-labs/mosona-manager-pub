@@ -93,8 +93,10 @@ export default function usePublicPreview(name?: string | null): PublicPreviewSta
                     }
 
                     const payload = JSON.parse(event.data) as PublicSSEPayload;
-                    // SSE payload does not currently include categories; keep existing categories
                     setServers(payload.servers);
+                    if (payload.categories) {
+                        setCategories(payload.categories);
+                    }
                     setStatus(payload.status);
                     setNow(payload.now);
                     setStreamState('live');

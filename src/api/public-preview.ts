@@ -26,6 +26,8 @@ export type PublicMonitor = {
     traffic?: string | null;
     traffic_type?: number | null;
     note_public?: string | null;
+    core_c?: number | null;
+    core_t?: number | null;
 };
 
 export type Category = {

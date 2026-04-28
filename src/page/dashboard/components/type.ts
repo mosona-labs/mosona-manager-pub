@@ -47,4 +47,6 @@ export interface Server {
     bandwidth?: string | null;
     traffic?: string | null;
     note_public?: string | null;
+    core_c?: number | null;
+    core_t?: number | null;
 }

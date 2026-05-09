@@ -22,7 +22,7 @@ import {
     Sun,
     WifiOff,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import CategorySection from './components/category';
@@ -268,6 +268,9 @@ export default function Dashboard() {
     const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
     const [prefersDark, setPrefersDark] = useState(getSystemPrefersDark);
     const [showAllOverviewCards, setShowAllOverviewCards] = useState(false);
+    const [visibleCategoryCount, setVisibleCategoryCount] = useState(0);
+    const categoryControlsRef = useRef<HTMLDivElement>(null);
+    const categoryMeasureRef = useRef<HTMLDivElement>(null);
     const isDarkMode = theme === 'dark' || (theme === 'system' && prefersDark);
 
     useEffect(() => {
@@ -351,6 +354,73 @@ export default function Dashboard() {
             return !isDefaultCategory(category) || categoryServers.length > 0;
         });
     }, [categories, categoryServerMap]);
+
+    const visibleCategoryTabs = useMemo(
+        () => visibleCategories.slice(0, visibleCategoryCount),
+        [visibleCategories, visibleCategoryCount]
+    );
+    const overflowCategories = useMemo(
+        () => visibleCategories.slice(visibleCategoryCount),
+        [visibleCategories, visibleCategoryCount]
+    );
+
+    useLayoutEffect(() => {
+        const controls = categoryControlsRef.current;
+        const measureRoot = categoryMeasureRef.current;
+        if (!controls || !measureRoot) return;
+
+        const measure = () => {
+            const availableWidth = controls.getBoundingClientRect().width;
+            const allButton = measureRoot.querySelector<HTMLButtonElement>(
+                '[data-category-measure="all"]'
+            );
+            const moreButton = measureRoot.querySelector<HTMLButtonElement>(
+                '[data-category-measure="more"]'
+            );
+            const categoryButtons = Array.from(
+                measureRoot.querySelectorAll<HTMLButtonElement>(
+                    '[data-category-measure="category"]'
+                )
+            );
+
+            if (!availableWidth || !allButton || !moreButton) {
+                setVisibleCategoryCount(visibleCategories.length);
+                return;
+            }
+
+            let usedWidth = allButton.getBoundingClientRect().width;
+            let nextVisibleCount = 0;
+            const moreWidth = moreButton.getBoundingClientRect().width;
+
+            for (const categoryButton of categoryButtons) {
+                const categoryWidth = categoryButton.getBoundingClientRect().width;
+                const hasOverflowAfterThis = nextVisibleCount + 1 < visibleCategories.length;
+                const requiredWidth =
+                    usedWidth + categoryWidth + (hasOverflowAfterThis ? moreWidth : 0);
+
+                if (requiredWidth > availableWidth) {
+                    break;
+                }
+
+                usedWidth += categoryWidth;
+                nextVisibleCount++;
+            }
+
+            setVisibleCategoryCount(nextVisibleCount);
+        };
+
+        measure();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', measure);
+            return () => window.removeEventListener('resize', measure);
+        }
+
+        const resizeObserver = new ResizeObserver(measure);
+        resizeObserver.observe(controls);
+
+        return () => resizeObserver.disconnect();
+    }, [visibleCategories]);
 
     useEffect(() => {
         if (
@@ -702,7 +772,7 @@ export default function Dashboard() {
                                             <ArrowUpDown className="h-3 w-3 md:h-5 md:w-5 text-chart-2" />
                                         </div>
                                         <div>
-                                            <p className="text-xs md:text-sm text-muted-foreground">
+                                            <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">
                                                 Network Traffic
                                             </p>
                                             <p className="text-xs 2xl:text-sm font-semibold text-card-foreground flex flex-col mt-1 -mb-1 2xl:my-0 2xl:flex-row 2xl:items-center 2xl:gap-1 h-[2rem]">
@@ -780,70 +850,97 @@ export default function Dashboard() {
                         </div>
 
                         <div className="mt-4 flex gap-2 flex-row justify-between lg:items-center w-full">
-                            <ButtonGroup className="border rounded-lg">
-                                <Button
-                                    variant="ghost"
-                                    className={categoryFilter == null ? 'bg-accent' : ''}
-                                    onClick={() => setCategoryFilter(null)}
-                                >
-                                    All
-                                </Button>
-                                {visibleCategories.slice(0, 3).map((category, index) => (
+                            <div ref={categoryControlsRef} className="min-w-0 flex-1">
+                                <ButtonGroup className="max-w-full overflow-hidden border rounded-lg">
                                     <Button
-                                        key={category.id}
                                         variant="ghost"
-                                        className={cn(
-                                            index < visibleCategories.length - 1
-                                                ? 'border-e'
-                                                : undefined,
-                                            categoryFilter == category.id ? 'bg-accent' : ''
-                                        )}
-                                        onClick={() => setCategoryFilter(category.id)}
+                                        className={categoryFilter == null ? 'bg-accent' : ''}
+                                        onClick={() => setCategoryFilter(null)}
                                     >
-                                        {category.name}
+                                        All
                                     </Button>
-                                ))}
-                                {visibleCategories.length > 3 && (
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                className={cn(
-                                                    categoryFilter &&
-                                                        visibleCategories
-                                                            .slice(3)
-                                                            .some(
-                                                                (item) => item.id === categoryFilter
+                                    {visibleCategoryTabs.map((category, index) => (
+                                        <Button
+                                            key={category.id}
+                                            variant="ghost"
+                                            className={cn(
+                                                index < visibleCategoryTabs.length - 1 ||
+                                                    overflowCategories.length > 0
+                                                    ? 'border-e'
+                                                    : undefined,
+                                                categoryFilter == category.id ? 'bg-accent' : ''
+                                            )}
+                                            onClick={() => setCategoryFilter(category.id)}
+                                        >
+                                            {category.name}
+                                        </Button>
+                                    ))}
+                                    {overflowCategories.length > 0 && (
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    className={cn(
+                                                        categoryFilter &&
+                                                            overflowCategories.some(
+                                                                (item) =>
+                                                                    item.id === categoryFilter
                                                             )
-                                                        ? 'bg-accent'
-                                                        : ''
-                                                )}
+                                                            ? 'bg-accent'
+                                                            : ''
+                                                    )}
+                                                >
+                                                    ...
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-40 mt-2 p-0 bg-background">
+                                                <div className="space-y-2">
+                                                    {overflowCategories.map((item) => (
+                                                        <Button
+                                                            key={item.id}
+                                                            variant="ghost"
+                                                            className={cn(
+                                                                'w-full justify-start',
+                                                                categoryFilter == item.id
+                                                                    ? 'bg-accent'
+                                                                    : ''
+                                                            )}
+                                                            onClick={() =>
+                                                                setCategoryFilter(item.id)
+                                                            }
+                                                        >
+                                                            {item.name}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
+                                    )}
+                                </ButtonGroup>
+                                <div
+                                    ref={categoryMeasureRef}
+                                    className="fixed -left-[9999px] top-0 pointer-events-none opacity-0"
+                                    aria-hidden="true"
+                                >
+                                    <ButtonGroup className="border rounded-lg">
+                                        <Button variant="ghost" data-category-measure="all">
+                                            All
+                                        </Button>
+                                        {visibleCategories.map((category) => (
+                                            <Button
+                                                key={category.id}
+                                                variant="ghost"
+                                                data-category-measure="category"
                                             >
-                                                ...
+                                                {category.name}
                                             </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-40 mt-2 p-0 bg-background">
-                                            <div className="space-y-2">
-                                                {visibleCategories.slice(3).map((item) => (
-                                                    <Button
-                                                        key={item.id}
-                                                        variant="ghost"
-                                                        className={cn(
-                                                            'w-full justify-start',
-                                                            categoryFilter == item.id
-                                                                ? 'bg-accent'
-                                                                : ''
-                                                        )}
-                                                        onClick={() => setCategoryFilter(item.id)}
-                                                    >
-                                                        {item.name}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        </PopoverContent>
-                                    </Popover>
-                                )}
-                            </ButtonGroup>
+                                        ))}
+                                        <Button variant="ghost" data-category-measure="more">
+                                            ...
+                                        </Button>
+                                    </ButtonGroup>
+                                </div>
+                            </div>
                             <div className="flex-row justify-end gap-2">
                                 <ButtonGroup>
                                     <Tooltip>

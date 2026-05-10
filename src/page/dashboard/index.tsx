@@ -858,25 +858,27 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <div className="mt-4 flex gap-2 flex-row justify-between lg:items-center w-full">
-                            <div ref={categoryControlsRef} className="min-w-0 flex-1">
-                                <ButtonGroup className="max-w-full overflow-hidden border rounded-lg">
+                        <div className="mt-4 flex w-full flex-col gap-3">
+                            <div className="flex flex-col gap-3 lg:hidden">
+                                <div className="flex flex-wrap gap-2">
                                     <Button
                                         variant="ghost"
-                                        className={categoryFilter == null ? 'bg-accent' : ''}
+                                        size="sm"
+                                        className={cn(
+                                            'shrink-0 whitespace-nowrap border shadow-sm',
+                                            categoryFilter == null ? 'bg-accent' : ''
+                                        )}
                                         onClick={() => setCategoryFilter(null)}
                                     >
                                         All
                                     </Button>
-                                    {visibleCategoryTabs.map((category, index) => (
+                                    {visibleCategories.map((category) => (
                                         <Button
                                             key={category.id}
                                             variant="ghost"
+                                            size="sm"
                                             className={cn(
-                                                index < visibleCategoryTabs.length - 1 ||
-                                                    overflowCategories.length > 0
-                                                    ? 'border-e'
-                                                    : undefined,
+                                                'shrink-0 whitespace-nowrap border shadow-sm',
                                                 categoryFilter == category.id ? 'bg-accent' : ''
                                             )}
                                             onClick={() => setCategoryFilter(category.id)}
@@ -884,95 +886,157 @@ export default function Dashboard() {
                                             {category.name}
                                         </Button>
                                     ))}
-                                    {overflowCategories.length > 0 && (
-                                        <Popover>
-                                            <PopoverTrigger asChild>
+                                </div>
+                                <div className="flex justify-end">
+                                    <ButtonGroup>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
                                                 <Button
-                                                    variant="ghost"
-                                                    className={cn(
-                                                        isOverflowCategorySelected
-                                                            ? 'bg-accent'
-                                                            : ''
-                                                    )}
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setShowAllOverviewCards(
+                                                            (visible) => !visible
+                                                        )
+                                                    }
                                                 >
-                                                    ...
+                                                    <StretchHorizontal />
                                                 </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-40 mt-2 p-0 bg-background">
-                                                <div className="space-y-2">
-                                                    {overflowCategories.map((item) => (
-                                                        <Button
-                                                            key={item.id}
-                                                            variant="ghost"
-                                                            className={cn(
-                                                                'w-full justify-start',
-                                                                categoryFilter == item.id
-                                                                    ? 'bg-accent'
-                                                                    : ''
-                                                            )}
-                                                            onClick={() =>
-                                                                setCategoryFilter(item.id)
-                                                            }
-                                                        >
-                                                            {item.name}
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
-                                    )}
-                                </ButtonGroup>
-                                <div
-                                    ref={categoryMeasureRef}
-                                    className="fixed -left-[9999px] top-0 pointer-events-none opacity-0"
-                                    aria-hidden="true"
-                                >
-                                    <ButtonGroup className="border rounded-lg">
-                                        <Button variant="ghost" data-category-measure="all">
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" className="me-2">
+                                                {showAllOverviewCards ? (
+                                                    <p>Hide Overview Cards</p>
+                                                ) : (
+                                                    <p>Show All Overview Cards</p>
+                                                )}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        <LayoutBtn layout={layout} onChange={setLayout} />
+                                        <DetailBtn
+                                            showDetails={showDetails}
+                                            onChange={setShowDetails}
+                                        />
+                                    </ButtonGroup>
+                                </div>
+                            </div>
+
+                            <div className="hidden lg:flex gap-2 flex-row justify-between lg:items-center w-full">
+                                <div ref={categoryControlsRef} className="min-w-0 flex-1">
+                                    <ButtonGroup className="max-w-full overflow-hidden border rounded-lg">
+                                        <Button
+                                            variant="ghost"
+                                            className={categoryFilter == null ? 'bg-accent' : ''}
+                                            onClick={() => setCategoryFilter(null)}
+                                        >
                                             All
                                         </Button>
-                                        {visibleCategories.map((category) => (
+                                        {visibleCategoryTabs.map((category, index) => (
                                             <Button
                                                 key={category.id}
                                                 variant="ghost"
-                                                data-category-measure="category"
+                                                className={cn(
+                                                    index < visibleCategoryTabs.length - 1 ||
+                                                        overflowCategories.length > 0
+                                                        ? 'border-e'
+                                                        : undefined,
+                                                    categoryFilter == category.id ? 'bg-accent' : ''
+                                                )}
+                                                onClick={() => setCategoryFilter(category.id)}
                                             >
                                                 {category.name}
                                             </Button>
                                         ))}
-                                        <Button variant="ghost" data-category-measure="more">
-                                            ...
-                                        </Button>
+                                        {overflowCategories.length > 0 && (
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className={cn(
+                                                            isOverflowCategorySelected
+                                                                ? 'bg-accent'
+                                                                : ''
+                                                        )}
+                                                    >
+                                                        ...
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-40 mt-2 p-0 bg-background">
+                                                    <div className="space-y-2">
+                                                        {overflowCategories.map((item) => (
+                                                            <Button
+                                                                key={item.id}
+                                                                variant="ghost"
+                                                                className={cn(
+                                                                    'w-full justify-start',
+                                                                    categoryFilter == item.id
+                                                                        ? 'bg-accent'
+                                                                        : ''
+                                                                )}
+                                                                onClick={() =>
+                                                                    setCategoryFilter(item.id)
+                                                                }
+                                                            >
+                                                                {item.name}
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+                                                </PopoverContent>
+                                            </Popover>
+                                        )}
+                                    </ButtonGroup>
+                                    <div
+                                        ref={categoryMeasureRef}
+                                        className="fixed -left-[9999px] top-0 pointer-events-none opacity-0"
+                                        aria-hidden="true"
+                                    >
+                                        <ButtonGroup className="border rounded-lg">
+                                            <Button variant="ghost" data-category-measure="all">
+                                                All
+                                            </Button>
+                                            {visibleCategories.map((category) => (
+                                                <Button
+                                                    key={category.id}
+                                                    variant="ghost"
+                                                    data-category-measure="category"
+                                                >
+                                                    {category.name}
+                                                </Button>
+                                            ))}
+                                            <Button variant="ghost" data-category-measure="more">
+                                                ...
+                                            </Button>
+                                        </ButtonGroup>
+                                    </div>
+                                </div>
+                                <div className="flex-row justify-end gap-2">
+                                    <ButtonGroup>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setShowAllOverviewCards(
+                                                            (visible) => !visible
+                                                        )
+                                                    }
+                                                >
+                                                    <StretchHorizontal />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" className="me-2">
+                                                {showAllOverviewCards ? (
+                                                    <p>Hide Overview Cards</p>
+                                                ) : (
+                                                    <p>Show All Overview Cards</p>
+                                                )}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        <LayoutBtn layout={layout} onChange={setLayout} />
+                                        <DetailBtn
+                                            showDetails={showDetails}
+                                            onChange={setShowDetails}
+                                        />
                                     </ButtonGroup>
                                 </div>
-                            </div>
-                            <div className="flex-row justify-end gap-2">
-                                <ButtonGroup>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setShowAllOverviewCards((visible) => !visible)
-                                                }
-                                            >
-                                                <StretchHorizontal />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="bottom" className="me-2">
-                                            {showAllOverviewCards ? (
-                                                <p>Hide Overview Cards</p>
-                                            ) : (
-                                                <p>Show All Overview Cards</p>
-                                            )}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                    <LayoutBtn layout={layout} onChange={setLayout} />
-                                    <DetailBtn
-                                        showDetails={showDetails}
-                                        onChange={setShowDetails}
-                                    />
-                                </ButtonGroup>
                             </div>
                         </div>
 

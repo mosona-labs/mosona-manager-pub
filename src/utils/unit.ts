@@ -1,119 +1,59 @@
-const NetUnit = (value: number, base: 'kb' | 'mb' | 'gb') => {
-    let v: number, u: string;
-    let m: number = 1;
-    switch (base) {
-        case 'kb':
-            if (value < 1024) {
-                v = value;
-                u = 'KB';
-            } else if (value < 1024 * 1024) {
-                v = value / 1024;
-                u = 'MB';
-                m = 1024;
-            } else {
-                v = value / (1024 * 1024);
-                u = 'GB';
-                m = 1024 * 1024;
-            }
-            break;
-        case 'mb':
-            if (value < 1024) {
-                v = value;
-                u = 'MB';
-            } else if (value < 1024 * 1024) {
-                v = value / 1024;
-                u = 'GB';
-                m = 1024;
-            } else {
-                v = value / (1024 * 1024);
-                u = 'TB';
-                m = 1024 * 1024;
-            }
-            break;
-        case 'gb':
-            if (value < 1024) {
-                v = value;
-                u = 'GB';
-            } else {
-                v = value / 1024;
-                u = 'TB';
-                m = 1024;
-            }
-            break;
+type StorageUnit = 'kb' | 'mb' | 'gb' | 'tb' | 'pb';
+
+const STORAGE_UNITS: Array<{ key: StorageUnit; label: string }> = [
+    { key: 'kb', label: 'KB' },
+    { key: 'mb', label: 'MB' },
+    { key: 'gb', label: 'GB' },
+    { key: 'tb', label: 'TB' },
+    { key: 'pb', label: 'PB' },
+];
+
+const getUnitIndex = (unit: StorageUnit) => STORAGE_UNITS.findIndex((item) => item.key === unit);
+
+const normalizeUnit = (value: number, base: StorageUnit) => {
+    const baseIndex = getUnitIndex(base);
+    if (baseIndex === -1) {
+        throw new Error('Invalid unit');
     }
+
+    let unitIndex = baseIndex;
+    let multiple = 1;
+
+    while (Math.abs(value) / multiple >= 1024 && unitIndex < STORAGE_UNITS.length - 1) {
+        multiple *= 1024;
+        unitIndex++;
+    }
+
     return {
-        value: v.toFixed(2),
-        unit: u,
-        multiple: m,
+        value: value / multiple,
+        unit: STORAGE_UNITS[unitIndex].label,
+        multiple,
     };
 };
 
-const MemoryUnit = (value: number, base: 'kb' | 'mb' | 'gb') => {
-    let v: string;
-    switch (base) {
-        case 'kb':
-            if (value < 1024) {
-                v = value.toFixed(2) + 'KB';
-            } else if (value < 1024 * 1024) {
-                v = (value / 1024).toFixed(2) + 'MB';
-            } else {
-                v = (value / (1024 * 1024)).toFixed(2) + 'GB';
-            }
-            break;
-        case 'mb':
-            if (value < 1024) {
-                v = value.toFixed(2) + 'MB';
-            } else if (value < 1024 * 1024) {
-                v = (value / 1024).toFixed(2) + 'GB';
-            } else {
-                v = (value / (1024 * 1024)).toFixed(2) + 'TB';
-            }
-            break;
-        case 'gb':
-            if (value < 1024) {
-                v = value.toFixed(2) + 'GB';
-            } else {
-                v = (value / 1024).toFixed(2) + 'TB';
-            }
-            break;
-    }
-    return v;
+const NetUnit = (value: number, base: StorageUnit) => {
+    const normalized = normalizeUnit(value, base);
+
+    return {
+        value: normalized.value.toFixed(2),
+        unit: normalized.unit,
+        multiple: normalized.multiple,
+    };
 };
 
-const UnitConverter = (
-    value: number,
-    from: 'kb' | 'mb' | 'gb' | 'tb',
-    to: 'kb' | 'mb' | 'gb' | 'tb'
-) => {
-    let kbValue: number;
-    switch (from) {
-        case 'kb':
-            kbValue = value;
-            break;
-        case 'mb':
-            kbValue = value * 1024;
-            break;
-        case 'gb':
-            kbValue = value * 1024 * 1024;
-            break;
-        case 'tb':
-            kbValue = value * 1024 * 1024 * 1024;
-            break;
-        default:
-            throw new Error('Invalid from unit');
+const MemoryUnit = (value: number, base: StorageUnit) => {
+    const normalized = normalizeUnit(value, base);
+    return normalized.value.toFixed(2) + normalized.unit;
+};
+
+const UnitConverter = (value: number, from: StorageUnit, to: StorageUnit) => {
+    const fromIndex = getUnitIndex(from);
+    const toIndex = getUnitIndex(to);
+    if (fromIndex === -1 || toIndex === -1) {
+        throw new Error('Invalid unit');
     }
-    switch (to) {
-        case 'kb':
-            return kbValue;
-        case 'mb':
-            return kbValue / 1024;
-        case 'gb':
-            return kbValue / (1024 * 1024);
-        case 'tb':
-            return kbValue / (1024 * 1024 * 1024);
-        default:
-            throw new Error('Invalid to unit');
-    }
+
+    return value * Math.pow(1024, fromIndex - toIndex);
 };
 
 export { NetUnit, MemoryUnit, UnitConverter };

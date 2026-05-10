@@ -269,6 +269,7 @@ export default function Dashboard() {
     const [prefersDark, setPrefersDark] = useState(getSystemPrefersDark);
     const [showAllOverviewCards, setShowAllOverviewCards] = useState(false);
     const [visibleCategoryCount, setVisibleCategoryCount] = useState(0);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const categoryControlsRef = useRef<HTMLDivElement>(null);
     const categoryMeasureRef = useRef<HTMLDivElement>(null);
     const isDarkMode = theme === 'dark' || (theme === 'system' && prefersDark);
@@ -362,6 +363,11 @@ export default function Dashboard() {
     const overflowCategories = useMemo(
         () => visibleCategories.slice(visibleCategoryCount),
         [visibleCategories, visibleCategoryCount]
+    );
+    const isOverflowCategorySelected = useMemo(
+        () =>
+            categoryFilter != null && overflowCategories.some((item) => item.id === categoryFilter),
+        [categoryFilter, overflowCategories]
     );
 
     useLayoutEffect(() => {
@@ -565,7 +571,10 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="w-full p-5 h-full overflow-y-auto pb-24 min-h-screen relative flex justify-center">
+        <div
+            ref={scrollContainerRef}
+            className="w-full p-5 h-full overflow-y-auto pb-24 min-h-screen relative flex justify-center"
+        >
             <div className="w-full max-w-[1800px] relative">
                 {/* Skeleton overlay */}
                 {showSkeleton ? (
@@ -881,11 +890,7 @@ export default function Dashboard() {
                                                 <Button
                                                     variant="ghost"
                                                     className={cn(
-                                                        categoryFilter &&
-                                                            overflowCategories.some(
-                                                                (item) =>
-                                                                    item.id === categoryFilter
-                                                            )
+                                                        isOverflowCategorySelected
                                                             ? 'bg-accent'
                                                             : ''
                                                     )}
@@ -981,6 +986,7 @@ export default function Dashboard() {
                                           servers={categoryServerMap[category.id]}
                                           showDetails={showDetails}
                                           mounted={mounted}
+                                          scrollRootRef={scrollContainerRef}
                                       />
                                   ) : (
                                       <div key={category.id}>
@@ -1006,6 +1012,7 @@ export default function Dashboard() {
                                               servers={categoryServerMap[category.id]}
                                               showDetails={showDetails}
                                               mounted={mounted}
+                                              scrollRootRef={scrollContainerRef}
                                           />
                                       ) : (
                                           <div key={category.id}>

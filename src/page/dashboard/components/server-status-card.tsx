@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { MemoryUnit, NetUnit } from '@/utils/unit';
-import { osIcons } from '@/utils/icon';
+import { getOsIconName } from '@/utils/icon';
 import { formatUptime, getRemainingTime } from '@/utils/time';
 
 const cycleMap: Record<number, string> = {
@@ -236,7 +236,7 @@ export default function ServerStatusCard({
                         <div className="flex items-center gap-3 flex-1">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-2xl flex-shrink-0">
                                 <img
-                                    src={`/icons/${server.os && osIcons.includes(server.os.toLowerCase()) ? server.os.toLowerCase() : 'linux'}.svg`}
+                                    src={`/icons/${getOsIconName(server.os)}.svg`}
                                     alt="OS"
                                     className="h-6 w-6"
                                 />
@@ -434,7 +434,7 @@ export default function ServerStatusCard({
                         <div className="flex items-center gap-3 w-full lg:flex-1">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-2xl flex-shrink-0">
                                 <img
-                                    src={`/icons/${server.os && osIcons.includes(server.os.toLowerCase()) ? server.os.toLowerCase() : 'linux'}.svg`}
+                                    src={`/icons/${getOsIconName(server.os)}.svg`}
                                     alt="OS"
                                     className="h-6 w-6"
                                 />

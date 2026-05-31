@@ -15,7 +15,7 @@ export default defineConfig({
     server: {
         proxy: {
             '/api': {
-                target: 'http://localhost:3214',
+                target: 'https://lovejk.cc/',
                 changeOrigin: true,
                 ws: true,
             },
@@ -23,7 +23,7 @@ export default defineConfig({
                 target: 'http://localhost:3214',
                 changeOrigin: true,
                 ws: true,
-            }
+            },
         },
     },
     build: {

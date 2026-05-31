@@ -19,7 +19,7 @@ const osIconAliases: Record<string, string[]> = {
     macos: ['macos', 'mac os', 'darwin'],
     almalinux: ['almalinux', 'alma linux'],
     freebsd: ['freebsd'],
-    'opensuse-leap': ['opensuse leap', 'open suse leap'],
+    'opensuse-leap': ['opensuse', 'opensuse leap', 'open suse leap'],
     rockylinux: ['rockylinux', 'rocky linux', 'rocky'],
     redhat: ['redhat', 'red hat', 'rhel'],
     ubuntu: ['ubuntu'],
@@ -36,6 +36,8 @@ const normalizeOsName = (os: string) =>
 export const getOsIconName = (os?: string | null) => {
     const normalized = os ? normalizeOsName(os) : '';
     if (!normalized) return 'linux';
+
+    console.log(`Normalized OS name: "${normalized}"`);
 
     const exactIcon = osIcons.find((icon) => normalized === normalizeOsName(icon));
     if (exactIcon) return exactIcon;
